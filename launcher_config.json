@@ -1,0 +1,25 @@
+{
+  "github_owner": "DropsIZI",
+  "github_repo": "cobbleversemmo-modpack",
+  "selected_version": "normal",
+  "versions": {
+    "normal": {
+      "name": "CobbleverseMMO",
+      "subtitle": "Experiencia completa",
+      "description": "Todos los mods, shaders y resource packs",
+      "manifest_path": "manifests/normal.json",
+      "install_dir": "",
+      "color": "#c0392b",
+      "color_dark": "#7b241c"
+    },
+    "lite": {
+      "name": "POTATOVERSEMMO",
+      "subtitle": "Version LITE",
+      "description": "Optimizada para PCs de gama baja",
+      "manifest_path": "manifests/lite.json",
+      "install_dir": "",
+      "color": "#27ae60",
+      "color_dark": "#1a6e3c"
+    }
+  }
+}

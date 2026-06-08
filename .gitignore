@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+*.spec
+*.zip
+*.log
+_staging/
+_missing_log.txt
+upload_all_log.txt
+upload_final_log.txt
+upload_normal_log.txt
+upload_lite_log.txt
+.claude/
+Imagen fondo del Launcher/
+github-repo/
