@@ -38,6 +38,8 @@ GITHUB_REPO  = "cobbleversemmo-modpack"
 SERVER_HOST  = "cobbleversemmo.net"
 SERVER_PORT  = 30270
 NEWS_URL     = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/news.json"
+# Contenido propio del equipo (carpeta extra/ del repo, generado por el Action).
+EXTRA_MANIFEST_PATH = "manifests/extra.json"
 
 LAUNCHER_DIR = (Path(sys.executable).parent
                 if getattr(sys, "frozen", False)
@@ -222,6 +224,26 @@ def sha256(path):
 
 def fetch_manifest(url):
     r = requests.get(url, timeout=30); r.raise_for_status(); return r.json()
+
+def fetch_extra_files():
+    """Archivos propios del equipo (carpeta extra/ del repo). API primero (sin
+    caché → al instante) y raw de respaldo. Devuelve [] si no hay/falla."""
+    api = (f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+           f"/contents/{EXTRA_MANIFEST_PATH}")
+    raw = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/{EXTRA_MANIFEST_PATH}"
+    for url, hdr in ((api, {"Accept": "application/vnd.github.raw+json",
+                            "User-Agent": "CobbleverseMMO-Launcher"}),
+                     (raw, {})):
+        try:
+            r = requests.get(url, headers=hdr, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            files = data.get("files", []) if isinstance(data, dict) else []
+            if isinstance(files, list):
+                return files
+        except Exception:
+            continue
+    return []
 
 def pending_files(manifest, game_dir):
     out = []
@@ -721,12 +743,14 @@ class Api:
             ver_cfg = VERSIONS_CFG[self.ver]
             game_dir = Path(ver_cfg["game_dir"]); game_dir.mkdir(parents=True, exist_ok=True)
 
-            # 1. Modpack
+            # 1. Modpack (base de Modrinth + contenido propio del equipo en extra/)
             self._progress(2, "Verificando archivos...")
             try:
                 manifest = fetch_manifest(ver_cfg["manifest"])
             except Exception as e:
                 self._fail(f"Error de red: {str(e)[:80]}"); return
+            manifest.setdefault("files", [])
+            manifest["files"] += fetch_extra_files()   # best-effort; [] si no hay
 
             pending = pending_files(manifest, game_dir)
             if pending:
