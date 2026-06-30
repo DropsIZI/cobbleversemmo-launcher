@@ -38,8 +38,9 @@ GITHUB_REPO  = "cobbleversemmo-modpack"
 SERVER_HOST  = "cobbleversemmo.net"
 SERVER_PORT  = 30270
 NEWS_URL     = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/news.json"
-# Contenido propio del equipo (carpeta extra/ del repo, generado por el Action).
-EXTRA_MANIFEST_PATH = "manifests/extra.json"
+# Registro local de archivos que el launcher instaló (para borrar los que se
+# quiten del modpack sin tocar lo que el jugador añadió por su cuenta).
+MANAGED_FILE = ".cobbleverse_managed.json"
 
 LAUNCHER_DIR = (Path(sys.executable).parent
                 if getattr(sys, "frozen", False)
@@ -225,12 +226,12 @@ def sha256(path):
 def fetch_manifest(url):
     r = requests.get(url, timeout=30); r.raise_for_status(); return r.json()
 
-def fetch_extra_files():
-    """Archivos propios del equipo (carpeta extra/ del repo). API primero (sin
-    caché → al instante) y raw de respaldo. Devuelve [] si no hay/falla."""
-    api = (f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
-           f"/contents/{EXTRA_MANIFEST_PATH}")
-    raw = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/{EXTRA_MANIFEST_PATH}"
+def fetch_extra_files(version):
+    """Archivos propios del equipo para esta versión (extra-normal.json /
+    extra-lite.json). API primero (sin caché → al instante) y raw de respaldo."""
+    path = f"manifests/extra-{version}.json"
+    api = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{path}"
+    raw = f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/main/{path}"
     for url, hdr in ((api, {"Accept": "application/vnd.github.raw+json",
                             "User-Agent": "CobbleverseMMO-Launcher"}),
                      (raw, {})):
@@ -244,6 +245,30 @@ def fetch_extra_files():
         except Exception:
             continue
     return []
+
+def apply_removals(manifest, game_dir):
+    """Borra del juego los archivos que el launcher instaló antes y que ya NO
+    están en el modpack (un mod retirado). No toca lo que el jugador añadió por
+    su cuenta, porque eso nunca estuvo en la lista de archivos gestionados."""
+    mf = game_dir / MANAGED_FILE
+    current = {e["path"] for e in manifest.get("files", []) if e.get("path")}
+    try:
+        old = set(json.loads(mf.read_text(encoding="utf-8")))
+    except Exception:
+        old = set()
+    removed = []
+    for path in (old - current):
+        p = game_dir / path
+        try:
+            if p.is_file():
+                p.unlink(); removed.append(path)
+        except Exception:
+            pass
+    try:
+        mf.write_text(json.dumps(sorted(current), ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return removed
 
 def pending_files(manifest, game_dir):
     out = []
@@ -750,7 +775,7 @@ class Api:
             except Exception as e:
                 self._fail(f"Error de red: {str(e)[:80]}"); return
             manifest.setdefault("files", [])
-            manifest["files"] += fetch_extra_files()   # best-effort; [] si no hay
+            manifest["files"] += fetch_extra_files(self.ver)   # best-effort; [] si no hay
 
             pending = pending_files(manifest, game_dir)
             if pending:
@@ -762,6 +787,10 @@ class Api:
                             cancel_ev=self._cancel_ev, workers=16)
                 if self._cancel_ev.is_set():
                     self._fail("Cancelado."); return
+            # borrar mods/archivos retirados del modpack (no toca lo del jugador)
+            removed = apply_removals(manifest, game_dir)
+            if removed:
+                self._progress(34, f"Eliminados {len(removed)} archivo(s) retirado(s) del modpack")
             self._progress(35, "Verificando Minecraft...")
 
             # 2. Minecraft
