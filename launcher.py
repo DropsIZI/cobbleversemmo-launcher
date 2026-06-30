@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """CobbleverseMMO Launcher — Arceus Edition (pywebview UI)."""
 
-import base64, hashlib, json, os, shutil, socket, subprocess, sys
+import base64, hashlib, json, os, shutil, subprocess, sys
 import threading, uuid
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
@@ -21,11 +21,6 @@ if not getattr(sys, "frozen", False):
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 creationflags=NOWND)
             break
-
-def _get_python_exe():
-    if getattr(sys, "frozen", False):
-        return shutil.which("pythonw") or shutil.which("python") or sys.executable
-    return sys.executable
 
 import requests
 import minecraft_launcher_lib
@@ -84,6 +79,15 @@ FALLBACK_NEWS = [
 
 CFG_FILE = BASE_DIR / "launcher.json"
 MS_CLIENT_ID = "9807cd61-bf58-4245-b40c-b8ffeea785dd"
+
+# Página que ve el usuario en el navegador tras iniciar sesión con Microsoft.
+_LOGIN_DONE_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>CobbleverseMMO</title></head>
+<body style="margin:0;background:#04060d;color:#f4d77a;font-family:system-ui,sans-serif;
+display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center">
+<h1 style="margin:0 0 10px">✓ Sesión iniciada</h1>
+<p style="color:#bdbdbd">Ya puedes cerrar esta pestaña y volver al launcher de CobbleverseMMO.</p>
+</body></html>"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -357,63 +361,6 @@ def ms_refresh_auth(client_id, refresh_token, on_step):
     return creds, token_data.get("refresh_token", refresh_token)
 
 
-def run_ms_login_window(redirect, login_url):
-    """Muestra la ventana de login de Microsoft y devuelve la URL de redirección.
-    Se ejecuta en un proceso hijo (modo --ms-login) para aislar su event loop.
-
-    - Detecta si el usuario CIERRA la ventana (evento closed) para no colgarse.
-    - private_mode=False + storage_path persisten la sesión de Microsoft, así no
-      hay que volver a escribir correo/contraseña la próxima vez."""
-    storage = str(BASE_DIR / "ms_webview")
-    try:
-        Path(storage).mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
-    captured = {"url": None}
-    done = {"v": False}
-    def _closed():
-        done["v"] = True
-    def monitor(w):
-        import time as _t
-        while not done["v"]:
-            try:
-                url = w.get_current_url() or ""
-                if url.startswith(redirect):
-                    captured["url"] = url; done["v"] = True; w.destroy(); return
-            except Exception:
-                pass
-            _t.sleep(0.2)
-    win = webview.create_window("Iniciar sesión con Microsoft", login_url,
-                                width=480, height=680, resizable=False)
-    try:
-        win.events.closed += _closed
-    except Exception:
-        pass
-    webview.start(monitor, win, gui="edgechromium",
-                  private_mode=False, storage_path=storage)
-    return captured["url"] or ""
-
-
-def ms_login_via_webview(redirect, login_url):
-    """Abre la ventana de login en un proceso hijo y captura la redirección.
-
-    Reinvoca el propio ejecutable con `--ms-login` (frozen) o el script con el
-    intérprete actual (dev) — NO depende de que el PC tenga Python instalado."""
-    if getattr(sys, "frozen", False):
-        cmd = [sys.executable, "--ms-login", redirect, login_url]
-    else:
-        cmd = [_get_python_exe(), os.path.abspath(__file__), "--ms-login", redirect, login_url]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=300, creationflags=NOWND)
-        for line in (result.stdout or "").splitlines():
-            if line.startswith("MSURL:"):
-                return line[len("MSURL:"):].strip()
-        return ""
-    except Exception:
-        return ""
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  JS API bridge
 # ─────────────────────────────────────────────────────────────────────────────
@@ -573,27 +520,45 @@ class Api:
         return True
 
     def _premium_worker(self):
+        """Login con Microsoft usando el NAVEGADOR del sistema + un mini-servidor
+        local que captura la redirección. Evita la ventana embebida (webview), que
+        Microsoft bloquea con 'There was an issue looking up your account'."""
+        import http.server, webbrowser, time
         from minecraft_launcher_lib.microsoft_account import (
             get_secure_login_data, parse_auth_code_url)
+        captured = {"url": None}
+        httpd = None
         try:
             try:
-                with socket.socket() as s:
-                    s.bind(("", 0)); port = s.getsockname()[1]
+                class _H(http.server.BaseHTTPRequestHandler):
+                    def do_GET(s):
+                        captured["url"] = f"http://localhost:{port}{s.path}"
+                        s.send_response(200)
+                        s.send_header("Content-Type", "text/html; charset=utf-8")
+                        s.end_headers()
+                        s.wfile.write(_LOGIN_DONE_HTML.encode("utf-8"))
+                    def log_message(s, *a): pass
+                httpd = http.server.HTTPServer(("127.0.0.1", 0), _H)
+                port = httpd.server_address[1]
                 redirect = f"http://localhost:{port}"
                 url, state, code_ver = get_secure_login_data(MS_CLIENT_ID, redirect)
             except Exception as e:
                 self._emit("onMsStatus", f"Error: {str(e)[:120]}", False)
                 return
 
-            self._emit("onMsStatus", "Abriendo ventana de Microsoft...", True)
-            redirect_url = ms_login_via_webview(redirect, url)
-            if not redirect_url:
-                self._emit("onMsStatus", "Login cancelado.", False)
+            httpd.timeout = 1
+            webbrowser.open(url)
+            self._emit("onMsStatus", "Inicia sesión en el navegador que se abrió y vuelve aquí…", True)
+            deadline = time.time() + 300
+            while captured["url"] is None and time.time() < deadline:
+                httpd.handle_request()  # bloquea ≤1s por iteración
+            if not captured["url"]:
+                self._emit("onMsStatus", "Login cancelado o expirado.", False)
                 return
 
             self._emit("onMsStatus", "Verificando cuenta...", True)
             try:
-                auth_code = parse_auth_code_url(redirect_url, state)
+                auth_code = parse_auth_code_url(captured["url"], state)
                 def step(n, t, msg): self._emit("onMsStatus", f"Paso {n}/{t}: {msg}", True)
                 creds, refresh = ms_manual_auth(MS_CLIENT_ID, redirect, code_ver, auth_code, step)
                 self.cfg["ms_refresh_token"] = refresh
@@ -602,6 +567,9 @@ class Api:
             except Exception as e:
                 self._emit("onMsStatus", f"Error: {type(e).__name__}: {str(e)[:140]}", False)
         finally:
+            if httpd:
+                try: httpd.server_close()
+                except Exception: pass
             self._ms_busy = False
 
     def logout(self):
@@ -951,15 +919,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Child process for the Microsoft login window (self re-invoke; no system
-    # Python required). Must be handled before the single-instance mutex.
-    if len(sys.argv) >= 4 and sys.argv[1] == "--ms-login":
-        try:
-            print("MSURL:" + run_ms_login_window(sys.argv[2], sys.argv[3]))
-        except Exception:
-            print("MSURL:")
-        sys.exit(0)
-
     if os.name == "nt":
         import ctypes
         _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "CobbleverseMMO_Launcher_Mutex")
