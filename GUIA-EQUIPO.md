@@ -46,23 +46,14 @@ Da acceso a tus compañeros en **GitHub → repo → Settings → Collaborators*
 
 ## 4. Publicar una noticia o evento (con imagen) 🟢
 
-Hay dos formas. **La fácil (recomendada para no-técnicos):**
+**La forma más fácil (sin terminal):** doble clic en **`Agregar-Noticia.bat`**.
+Te hace unas preguntas, y al final te pregunta *"¿Subir a GitHub ahora?"* → pones `s`
+y **se sube solo**. ¡Eso es todo! El launcher la muestra al instante.
 
-```bash
-cd cobbleversemmo-modpack
-python add_news.py        # te hace preguntas y rellena news.json solo
-```
+Si la noticia lleva imagen: copia primero la imagen en la carpeta `news/images/` y,
+cuando pregunte, escribe solo el nombre del archivo (ej. `evento-verano.png`).
 
-Si la noticia lleva imagen: copia primero la imagen en `news/images/` y, cuando el
-script pregunte, escribe solo el nombre del archivo (ej. `evento-verano.png`).
-
-Luego sube los cambios:
-```bash
-git add news.json news/images
-git commit -m "Noticia: torneo de verano"
-git push
-```
-¡Listo! El launcher la muestra al instante (no hay que recompilar nada).
+> Lo mismo desde terminal: `python add_news.py`
 
 **La forma manual:** edita `news.json` directamente. Cada noticia es:
 ```json
@@ -88,41 +79,27 @@ git push
 ## 5. Añadir/actualizar mods, datapacks o resource packs (Pokémon/texturas nuevos) 🟡
 
 Los binarios se gestionan a través del **perfil de Modrinth** y se suben a los **Releases**.
-El flujo (lo hace el encargado del modpack):
 
-1. **Modifica el modpack en Modrinth App:**
-   - **Mods nuevos** → carpeta `mods/` del perfil
-   - **Pokémon nuevos (datapacks)** → carpeta `datapacks/`
-   - **Texturas / resource packs** → carpeta `resourcepacks/`
-   - **Shaders** → carpeta `shaderpacks/`
+**1. Modifica el modpack en Modrinth App:**
+- **Mods nuevos** → carpeta `mods/` del perfil
+- **Pokémon nuevos (datapacks)** → carpeta `datapacks/`
+- **Texturas / resource packs** → carpeta `resourcepacks/`
+- **Shaders** → carpeta `shaderpacks/`
 
-   > Hazlo en el perfil **NORMAL** (`COBBLEVERSEMMO 1.5`) y, si aplica, también en el **LITE** (`POTATOVERSEMMO 1.5`).
+> Hazlo en el perfil **NORMAL** (`COBBLEVERSEMMO 1.5`) y, si aplica, también en el **LITE** (`POTATOVERSEMMO 1.5`).
 
-2. **Regenera los manifests** (desde la carpeta del launcher):
-   ```bash
-   cd "Launcher CobbleverseMMO"
-   python generate_manifest.py
-   ```
-   Esto actualiza `github-repo/manifests/*.json`, copia los configs y genera
-   `upload_normal.ps1` / `upload_lite.ps1`.
-
-3. **Sube los archivos a los Releases** (necesita `gh auth login` hecho):
-   ```powershell
-   .\upload_normal.ps1
-   .\upload_lite.ps1
-   ```
-   Solo sube/actualiza los archivos; los que no cambiaron se quedan igual.
-
-4. **Sube los manifests y configs al repo de contenido:**
-   ```bash
-   cd github-repo
-   git add manifests configs
-   git commit -m "Modpack: añadidos X Pokémon y Y mods"
-   git push
-   ```
+**2. Publícalo con UN solo paso:** doble clic en **`Publicar-Modpack.bat`**
+(o `python publicar_modpack.py`). Ese script hace todo de golpe:
+1. Regenera los manifests escaneando tu perfil de Modrinth
+2. Sube los archivos a los GitHub Releases (solo lo nuevo/cambiado)
+3. Te pide un mensaje y hace `git push` de los manifests/configs
 
 Al siguiente JUGAR, los jugadores descargan automáticamente lo nuevo. **No hay que
 recompilar ni redistribuir el `.exe`** para cambios de modpack.
+
+> Requisito una sola vez: GitHub CLI (`gh auth login`) y acceso al repo del modpack.
+> Si prefieres hacerlo a mano, los pasos sueltos son `python generate_manifest.py`,
+> luego `.\upload_normal.ps1` / `.\upload_lite.ps1`, y `git push` en `github-repo/`.
 
 > ⚠️ Si subes archivos **muy grandes** o muchos, el `gh release upload` puede tardar.
 > Cada quien que haga esto debe tener el mismo perfil de Modrinth sincronizado, si no
@@ -159,8 +136,7 @@ Si dos personas tocan lo mismo a la vez, Git avisará de un *conflicto*. Para ev
 
 ## 7. Resumen rápido
 
-- **Noticia nueva** → `python add_news.py` → `git push` (en `cobbleversemmo-modpack`)
-- **Pokémon / mods / texturas** → editar perfil Modrinth → `python generate_manifest.py` →
-  `.\upload_*.ps1` → `git push` de `manifests/` y `configs/`
+- **Noticia nueva** → doble clic en **`Agregar-Noticia.bat`** (sube solo). En `cobbleversemmo-modpack`.
+- **Pokémon / mods / texturas** → editar perfil Modrinth → doble clic en **`Publicar-Modpack.bat`**. En el launcher.
 - **Nada de esto necesita recompilar el `.exe`.** El launcher lee todo en vivo desde GitHub.
 - El `.exe` solo se recompila si cambia el **código del launcher** (ver `README.md`).
