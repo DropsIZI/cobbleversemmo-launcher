@@ -184,6 +184,8 @@
 
     // play
     play: function () { if (state.playing) return; call("play"); },
+    cancel: function () { call("cancel_play"); },
+    playOrCancel: function () { if (state.playing) cv.cancel(); else cv.play(); },
 
     // version
     toggleVersion: function () { $("versionMenu").classList.toggle("hidden"); },
@@ -243,12 +245,18 @@
     },
     onPlaying: function (playing) {
       state.playing = playing;
-      $("playLabel").textContent = playing ? "INICIANDO" : "JUGAR";
-      $("playBtn").style.opacity = playing ? ".85" : "1";
-      $("playBtn").style.cursor = playing ? "default" : "pointer";
+      var btn = $("playBtn");
+      btn.style.cursor = "pointer";
       if (playing) {
-        $("playIcon").outerHTML = "<span id=\"playIcon\" style=\"width:19px;height:19px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:cvspin .8s linear infinite\"></span>";
+        $("playLabel").textContent = "CANCELAR";
+        btn.style.background = "linear-gradient(135deg,#e0584f,#a31f1f)";
+        btn.style.boxShadow = "0 10px 32px rgba(204,43,43,.5),inset 0 1px 0 rgba(255,255,255,.2)";
+        // spinner (actividad) + se entiende que al pulsar se cancela
+        $("playIcon").outerHTML = "<span id=\"playIcon\" style=\"width:19px;height:19px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:cvspin .8s linear infinite\"></span>";
       } else {
+        $("playLabel").textContent = "JUGAR";
+        btn.style.background = "linear-gradient(135deg,#e8c75a,#b8901f)";
+        btn.style.boxShadow = "0 10px 32px rgba(212,175,55,.5),inset 0 1px 0 rgba(255,255,255,.25)";
         $("playIcon").outerHTML = "<svg id=\"playIcon\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"#fff\"><polygon points=\"6 4 20 12 6 20 6 4\"></polygon></svg>";
       }
     },

@@ -703,14 +703,34 @@ class Api:
         if not self.auth:
             self._emit("showLogin")
             return False
-        if self.ready and self._ldata:
-            self._launch()
-            return True
+        self.playing = True
         self._cancel_ev.clear()
         self._emit("onPlaying", True)
-        self._progress(0, "Preparando...")
-        self._thread = threading.Thread(target=self._worker, daemon=True)
-        self._thread.start()
+        if self.ready and self._ldata:
+            self._progress(100, "Iniciando Minecraft...")
+            self._launch()
+        else:
+            self._progress(0, "Preparando...")
+            self._thread = threading.Thread(target=self._worker, daemon=True)
+            self._thread.start()
+        return True
+
+    def cancel_play(self):
+        """Cancela la descarga en curso y/o cierra el Minecraft que se está iniciando."""
+        self._cancel_ev.set()
+        p = self._mc_proc
+        if p and p.poll() is None:
+            try: p.terminate()
+            except Exception: pass
+            try: p.wait(timeout=3)
+            except Exception:
+                try: p.kill()
+                except Exception: pass
+        self._mc_proc = None
+        self.playing = False
+        self._emit("onPlaying", False)
+        self._progress(100 if self.ready else 0,
+                       "Minecraft cancelado." if self.ready else "Cancelado.")
         return True
 
     def _worker(self):
@@ -778,14 +798,18 @@ class Api:
 
             self._ldata = {"fab_id": fab_id, "game_dir": str(game_dir), "java": java, "creds": creds}
             self.ready = True
-            self._progress(100, "¡Listo para jugar!")
             self._emit("onReady")
+            if self._cancel_ev.is_set():
+                self._fail("Cancelado.", reset_ready=False); return
             self._launch()
         except Exception as ex:
             self._fail(f"Error: {str(ex)[:100]}")
 
-    def _fail(self, msg):
-        self.ready = False
+    def _fail(self, msg, reset_ready=True):
+        self.playing = False
+        if reset_ready:
+            self.ready = False
+        self._mc_proc = None
         self._emit("onPlaying", False)
         self._progress(0, msg)
 
@@ -808,12 +832,26 @@ class Api:
             }
             cmd = minecraft_launcher_lib.command.get_minecraft_command(
                 version=d["fab_id"], minecraft_directory=str(MC_DIR), options=opts)
+            if self._cancel_ev.is_set():
+                return
             self._progress(100, "▶ Lanzando Minecraft...")
-            self._mc_proc = subprocess.Popen(cmd, cwd=d["game_dir"], creationflags=NOWND)
-            self._emit("onPlaying", False)
-            self._progress(100, "Minecraft en ejecución — ¡a jugar!")
+            proc = subprocess.Popen(cmd, cwd=d["game_dir"], creationflags=NOWND)
+            self._mc_proc = proc
+            self._progress(100, "Minecraft iniciándose… (pulsa CANCELAR para detenerlo)")
+            threading.Thread(target=self._watch_mc, args=(proc,), daemon=True).start()
         except Exception as ex:
             self._fail(f"Error al lanzar: {str(ex)[:100]}")
+
+    def _watch_mc(self, proc):
+        """Espera a que Minecraft termine y devuelve el botón a JUGAR."""
+        try: proc.wait()
+        except Exception: pass
+        if self._mc_proc is proc:           # sigue siendo el proceso actual
+            self._mc_proc = None
+            self.playing = False
+            if not self._cancel_ev.is_set():  # cierre normal (no cancelado)
+                self._emit("onPlaying", False)
+                self._progress(100, "Minecraft cerrado. ¡Listo para volver a jugar!")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

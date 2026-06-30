@@ -18,3 +18,5 @@ github-repo/
 # staged copies of Imagenes/ assets (generated at runtime by stage_web_assets)
 web/Icono.png
 web/LOGO.png
+upload_normal.ps1
+upload_lite.ps1

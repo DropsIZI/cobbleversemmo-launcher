@@ -6,26 +6,38 @@ Open-source launcher for the **CobbleverseMMO** Minecraft modpack (Fabric 1.21.1
 
 - Auto-update: downloads mods, configs, datapacks, resourcepacks and shaderpacks from GitHub Releases
 - Two modpack variants: **NORMAL** (full quality) and **LITE** (potato-friendly)
-- Microsoft (Premium) login via OAuth 2.0 + PKCE
+- Microsoft (Premium) login via OAuth 2.0 + PKCE — persistent session + silent re-login
 - Offline (No-Premium) login
-- Animated Space UI built with tkinter
-- Skin preview and management
-- Server online status indicator
+- Modern UI (HTML/CSS/JS) rendered with **pywebview** (WebView2) — "Arceus Edition" design
+- Real Minecraft skin rendering (head + body), custom `.png` upload
+- News & events feed (read live from the modpack repo) and in-launcher settings
+- Responsive window that fits any screen / DPI; self-installs WebView2 if missing
 
 ## Requirements
 
-- Python 3.10+
-- Dependencies are auto-installed on first run, or manually:
+- **To run from source:** Python 3.10+ (dependencies auto-installed on first run, or `pip install -r requirements.txt`)
+- **To use the built `.exe`:** nothing — it's self-contained (WebView2 auto-installs if absent)
 
-```
-pip install -r requirements.txt
-```
-
-## Usage
+## Run from source
 
 ```
 python launcher.py
 ```
+
+## Build the .exe (for distribution)
+
+```
+pip install pyinstaller
+pyinstaller "CobbleverseMMO Launcher.spec"
+```
+
+The distributable is the whole `dist/CobbleverseMMO Launcher/` folder (zip it — keep the
+`.exe` next to its `_internal` folder). Players don't need Python installed.
+
+## Team / contributors
+
+How to add mods, datapacks, resource packs (new Pokémon) and post news/events:
+see **[GUIA-EQUIPO.md](GUIA-EQUIPO.md)**.
 
 ## Azure App Registration
 
@@ -38,13 +50,16 @@ The app requests only the `XboxLive.signin offline_access` scopes needed to auth
 
 ## Project Structure
 
-| File | Description |
+| Path | Description |
 |------|-------------|
-| `launcher.py` | Main launcher GUI (player-facing) |
+| `launcher.py` | Main launcher + JS↔Python bridge (player-facing) |
+| `web/` | UI: `launcher.html`, `launcher.js`, `steve.png` (default skin) |
+| `Imagenes/` | App icon + corner icon + background logo |
+| `app.ico` | Window/exe icon |
+| `CobbleverseMMO Launcher.spec` | PyInstaller build config |
 | `generate_manifest.py` | Admin tool: scans Modrinth profiles, generates JSON manifests |
-| `upload_normal.ps1` / `upload_lite.ps1` | Upload mod binaries to GitHub Releases |
 | `upload_release.py` | Helper for GitHub Release uploads |
-| `launcher_config.json` | Config: GitHub repo, install directories |
+| `GUIA-EQUIPO.md` | Guide for contributors (mods, datapacks, news) |
 | `requirements.txt` | Python dependencies |
 
 ## Server

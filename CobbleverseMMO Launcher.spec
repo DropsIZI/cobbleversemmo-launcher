@@ -5,7 +5,7 @@ a = Analysis(
     ['launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('Imagen fondo del Launcher/Carga.webp', 'Imagen fondo del Launcher'), ('launcher_config.json', '.'), ('web', 'web'), ('Imagenes', 'Imagenes')],
+    datas=[('web', 'web'), ('Imagenes', 'Imagenes')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
