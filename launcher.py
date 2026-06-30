@@ -484,14 +484,26 @@ class Api:
         return True
 
     def _load_news(self):
-        try:
-            r = requests.get(NEWS_URL, timeout=10); r.raise_for_status()
-            payload = r.json()
-            news = payload.get("news", payload) if isinstance(payload, dict) else payload
-            if isinstance(news, list) and news:
-                self._emit("onNews", news)
-        except Exception:
-            pass  # fallback news already shown
+        # Try the GitHub API first (no CDN cache → noticias al instante para el
+        # equipo), then the raw CDN (~5 min de caché) como respaldo.
+        api_url = (f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+                   "/contents/news.json")
+        sources = [
+            (api_url, {"Accept": "application/vnd.github.raw+json",
+                       "User-Agent": "CobbleverseMMO-Launcher"}),
+            (NEWS_URL, {}),
+        ]
+        for url, headers in sources:
+            try:
+                r = requests.get(url, headers=headers, timeout=10)
+                r.raise_for_status()
+                payload = r.json()
+                news = payload.get("news", payload) if isinstance(payload, dict) else payload
+                if isinstance(news, list) and news:
+                    self._emit("onNews", news)
+                    return
+            except Exception:
+                continue  # prueba la siguiente fuente; si todas fallan, queda el fallback
 
     def _try_autologin(self):
         token = self.cfg.get("ms_refresh_token", "")
