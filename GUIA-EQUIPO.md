@@ -46,7 +46,13 @@ Da acceso a tus compañeros en **GitHub → repo → Settings → Collaborators*
 
 ## 4. Publicar una noticia o evento (con imagen) 🟢
 
-**La forma más fácil (sin terminal):** doble clic en **`Agregar-Noticia.bat`**.
+**La forma SIN instalar nada (desde el navegador):** entra a
+https://github.com/DropsIZI/cobbleversemmo-modpack
+→ abre `news.json` → botón ✏️ (editar) → añade tu noticia arriba → *Commit changes*.
+Para imágenes: entra a la carpeta `news/images` → *Add file* → *Upload files* → arrastra
+la imagen → *Commit*. (Solo necesitas cuenta de GitHub con acceso al repo.)
+
+**La forma fácil en tu PC (sin terminal):** doble clic en **`Agregar-Noticia.bat`**.
 Te hace unas preguntas, y al final te pregunta *"¿Subir a GitHub ahora?"* → pones `s`
 y **se sube solo**. ¡Eso es todo! El launcher la muestra al instante.
 
