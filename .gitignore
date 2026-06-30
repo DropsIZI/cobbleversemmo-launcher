@@ -15,3 +15,6 @@ upload_lite_log.txt
 .claude/
 Imagen fondo del Launcher/
 github-repo/
+# staged copies of Imagenes/ assets (generated at runtime by stage_web_assets)
+web/Icono.png
+web/LOGO.png
