@@ -20,3 +20,6 @@ web/Icono.png
 web/LOGO.png
 upload_normal.ps1
 upload_lite.ps1
+
+# Azure Client ID privado (no exponer en el repo público)
+ms_config.py

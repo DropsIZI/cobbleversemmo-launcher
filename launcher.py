@@ -81,7 +81,12 @@ FALLBACK_NEWS = [
 ]
 
 CFG_FILE = BASE_DIR / "launcher.json"
-MS_CLIENT_ID = "9807cd61-bf58-4245-b40c-b8ffeea785dd"
+# Azure Application (client) ID — se lee de ms_config.py (privado, no en GitHub).
+# Si no existe, el login premium queda deshabilitado (offline sigue funcionando).
+try:
+    from ms_config import MS_CLIENT_ID
+except Exception:
+    MS_CLIENT_ID = ""
 
 # Página que ve el usuario en el navegador tras iniciar sesión con Microsoft.
 _LOGIN_DONE_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">

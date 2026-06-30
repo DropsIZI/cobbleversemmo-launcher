@@ -39,14 +39,15 @@ The distributable is the whole `dist/CobbleverseMMO Launcher/` folder (zip it �
 How to add mods, datapacks, resource packs (new Pokémon) and post news/events:
 see **[GUIA-EQUIPO.md](GUIA-EQUIPO.md)**.
 
-## Azure App Registration
+## Microsoft login
 
-This launcher uses Microsoft OAuth for premium login.  
-**Azure Application (client) ID:** `9807cd61-bf58-4245-b40c-b8ffeea785dd`  
-**Supported account types:** Personal Microsoft accounts only  
-**Redirect URI:** `http://localhost` (public client / mobile & desktop)
+Premium login uses Microsoft OAuth 2.0 + PKCE (public client, `http://localhost`
+redirect, scopes `XboxLive.signin offline_access`). No data is stored on external
+servers — authentication tokens are kept locally on each player's PC.
 
-The app requests only the `XboxLive.signin offline_access` scopes needed to authenticate a Minecraft account. No data is stored on external servers — authentication tokens are kept locally.
+The Azure Application (client) ID is kept in a private `ms_config.py`
+(not committed). To build from source, copy `ms_config.example.py` to
+`ms_config.py` and add your own Azure client ID.
 
 ## Project Structure
 
