@@ -91,17 +91,24 @@ Hay **dos vías** según de dónde venga el contenido:
 Para contenido **propio del equipo** (no de Modrinth/CurseForge). **Sin instalar nada:**
 
 1. Entra a https://github.com/DropsIZI/cobbleversemmo-modpack
-2. Abre la carpeta:
-   - **`extra/mods/`** → tus mods (`.jar`, Fabric 1.21.1)
-   - **`extra/datapacks/`** → Pokémon/datapacks nuevos (`.zip`)
-   - **`extra/resourcepacks/`** → texturas (`.zip`)
+2. Elige la carpeta según dónde quieras que vaya:
+   - **`extra/ambos/`** → Normal **y** Lite (lo más común)
+   - **`extra/normal/`** → solo Normal
+   - **`extra/lite/`** → solo Lite
+
+   …y dentro, la subcarpeta del tipo: `mods/` (`.jar`, Fabric 1.21.1), `datapacks/` (`.zip`)
+   o `resourcepacks/` (`.zip`). Ejemplo: `extra/ambos/mods/mimod.jar`
 3. **Add file → Upload files** → arrastra tu archivo → **Commit changes**
 
 ¡Y ya! Un **robot (GitHub Action)** regenera la lista solo, y al siguiente **JUGAR**
 todos los jugadores lo descargan. Varios compañeros pueden subir a la vez sin pisarse.
-(Más detalles en `extra/README.md`.)
 
-> Esto es para contenido **propio y ligero**. Aplica a **ambas** versiones (Normal y LITE).
+**¿Un mod da problemas? Bórralo y desaparece de todos.** Elimina el archivo de su
+carpeta aquí en GitHub (botón 🗑️ → Commit). El launcher lo **borra automáticamente
+del PC de cada jugador** en su siguiente JUGAR. (No toca los mods que el jugador
+puso por su cuenta.)
+
+> Es para contenido **propio y ligero**. Más detalles en `extra/README.md`.
 
 ### 5B · Mods grandes de Modrinth/CurseForge — 🟡 el encargado del modpack
 
