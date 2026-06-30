@@ -82,30 +82,39 @@ cuando pregunte, escribe solo el nombre del archivo (ej. `evento-verano.png`).
 
 ---
 
-## 5. Añadir/actualizar mods, datapacks o resource packs (Pokémon/texturas nuevos) 🟡
+## 5. Añadir mods / datapacks / resource packs
 
-Los binarios se gestionan a través del **perfil de Modrinth** y se suben a los **Releases**.
+Hay **dos vías** según de dónde venga el contenido:
 
-**1. Modifica el modpack en Modrinth App:**
-- **Mods nuevos** → carpeta `mods/` del perfil
-- **Pokémon nuevos (datapacks)** → carpeta `datapacks/`
-- **Texturas / resource packs** → carpeta `resourcepacks/`
-- **Shaders** → carpeta `shaderpacks/`
+### 5A · Tu propio contenido (mods/datapacks/texturas que hiciste tú) — 🟢 cualquiera
 
-> Hazlo en el perfil **NORMAL** (`COBBLEVERSEMMO 1.5`) y, si aplica, también en el **LITE** (`POTATOVERSEMMO 1.5`).
+Para contenido **propio del equipo** (no de Modrinth/CurseForge). **Sin instalar nada:**
 
-**2. Publícalo con UN solo paso:** doble clic en **`Publicar-Modpack.bat`**
-(o `python publicar_modpack.py`). Ese script hace todo de golpe:
-1. Regenera los manifests escaneando tu perfil de Modrinth
-2. Sube los archivos a los GitHub Releases (solo lo nuevo/cambiado)
-3. Te pide un mensaje y hace `git push` de los manifests/configs
+1. Entra a https://github.com/DropsIZI/cobbleversemmo-modpack
+2. Abre la carpeta:
+   - **`extra/mods/`** → tus mods (`.jar`, Fabric 1.21.1)
+   - **`extra/datapacks/`** → Pokémon/datapacks nuevos (`.zip`)
+   - **`extra/resourcepacks/`** → texturas (`.zip`)
+3. **Add file → Upload files** → arrastra tu archivo → **Commit changes**
 
-Al siguiente JUGAR, los jugadores descargan automáticamente lo nuevo. **No hay que
-recompilar ni redistribuir el `.exe`** para cambios de modpack.
+¡Y ya! Un **robot (GitHub Action)** regenera la lista solo, y al siguiente **JUGAR**
+todos los jugadores lo descargan. Varios compañeros pueden subir a la vez sin pisarse.
+(Más detalles en `extra/README.md`.)
+
+> Esto es para contenido **propio y ligero**. Aplica a **ambas** versiones (Normal y LITE).
+
+### 5B · Mods grandes de Modrinth/CurseForge — 🟡 el encargado del modpack
+
+Los mods pesados de terceros (Cobblemon, Sodium…) se gestionan con el perfil de Modrinth:
+
+1. Modifica el modpack en **Modrinth App** (perfil `COBBLEVERSEMMO 1.5` y, si aplica, `POTATOVERSEMMO 1.5`):
+   mods → `mods/`, datapacks → `datapacks/`, texturas → `resourcepacks/`, shaders → `shaderpacks/`
+2. Doble clic en **`Publicar-Modpack.bat`** (o `python publicar_modpack.py`): regenera
+   los manifests + sube a los Releases + `git push`, todo de golpe.
 
 > Requisito una sola vez: GitHub CLI (`gh auth login`) y acceso al repo del modpack.
-> Si prefieres hacerlo a mano, los pasos sueltos son `python generate_manifest.py`,
-> luego `.\upload_normal.ps1` / `.\upload_lite.ps1`, y `git push` en `github-repo/`.
+
+**En ningún caso hay que recompilar ni redistribuir el `.exe`** — el launcher lee todo en vivo.
 
 > ⚠️ Si subes archivos **muy grandes** o muchos, el `gh release upload` puede tardar.
 > Cada quien que haga esto debe tener el mismo perfil de Modrinth sincronizado, si no
@@ -142,7 +151,8 @@ Si dos personas tocan lo mismo a la vez, Git avisará de un *conflicto*. Para ev
 
 ## 7. Resumen rápido
 
-- **Noticia nueva** → doble clic en **`Agregar-Noticia.bat`** (sube solo). En `cobbleversemmo-modpack`.
-- **Pokémon / mods / texturas** → editar perfil Modrinth → doble clic en **`Publicar-Modpack.bat`**. En el launcher.
+- **Noticia nueva** → `Agregar-Noticia.bat`, o subir a `news.json` desde github.com.
+- **Tu propio mod/datapack/textura** → subir a la carpeta **`extra/`** en github.com (el robot hace el resto). 🟢 cualquiera, sin instalar nada.
+- **Mods grandes de Modrinth** → editar perfil Modrinth → **`Publicar-Modpack.bat`** (el encargado).
 - **Nada de esto necesita recompilar el `.exe`.** El launcher lee todo en vivo desde GitHub.
 - El `.exe` solo se recompila si cambia el **código del launcher** (ver `README.md`).
