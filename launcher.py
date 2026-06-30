@@ -542,6 +542,9 @@ class Api:
                 port = httpd.server_address[1]
                 redirect = f"http://localhost:{port}"
                 url, state, code_ver = get_secure_login_data(MS_CLIENT_ID, redirect)
+                # forzar el selector "Elige una cuenta" (por si hay varias / PC compartido)
+                if "prompt=" not in url:
+                    url += ("&" if "?" in url else "?") + "prompt=select_account"
             except Exception as e:
                 self._emit("onMsStatus", f"Error: {str(e)[:120]}", False)
                 return
