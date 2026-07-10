@@ -75,6 +75,7 @@ EXCLUDE_NAMES = {
     "xaeropatreon.txt",
     "xaerohud.txt",
     "_0EUPHORIA_PATCHES_ERROR_LOGS.txt",
+    ".data.json",   # euphoria_patcher lo crea oculto+solo-lectura en cada arranque
 }
 
 OUTPUT_DIR    = Path(__file__).parent / "github-repo"

@@ -323,11 +323,40 @@ def pending_files(manifest, game_dir):
             out.append(e)
     return out
 
+def _clear_attrs(p):
+    """Quita 'solo lectura' y 'oculto'. Algunos mods (p.ej. euphoria_patcher)
+    marcan sus archivos así, y Windows no deja sobrescribirlos tal cual."""
+    try:
+        os.chmod(p, 0o666)
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetFileAttributesW(str(p), 0x80)  # FILE_ATTRIBUTE_NORMAL
+        except Exception:
+            pass
+
+def _atomic_replace(tmp, dest):
+    """tmp → dest, sorteando destinos ocultos/solo-lectura (WinError 5)."""
+    try:
+        tmp.replace(dest)
+        return
+    except OSError:
+        pass
+    if dest.exists():
+        _clear_attrs(dest)
+        try: dest.unlink()
+        except Exception: pass
+    tmp.replace(dest)
+
 def dl_one(url, dest, retries=3):
     """Descarga con reintentos y escritura atómica (.part → destino), para que un
     corte de red no deje archivos a medias ni aborte la descarga entera."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + ".part")
+    if tmp.exists():
+        _clear_attrs(tmp)      # restos de un intento anterior
     last = None
     for attempt in range(1, retries + 1):
         try:
@@ -338,7 +367,7 @@ def dl_one(url, dest, retries=3):
                     for chunk in r.iter_content(65536):
                         if chunk:
                             f.write(chunk)
-            tmp.replace(dest)
+            _atomic_replace(tmp, dest)
             return
         except Exception as ex:
             last = ex
