@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """CobbleverseMMO Launcher — Arceus Edition (pywebview UI)."""
 
-import base64, hashlib, json, os, shutil, subprocess, sys
-import threading, uuid
+import base64, hashlib, json, logging, logging.handlers, os, shutil, subprocess, sys
+import threading, time, traceback, uuid
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
@@ -88,6 +88,36 @@ try:
 except Exception:
     MS_CLIENT_ID = ""
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Log — informe para testers (%APPDATA%\\CobbleverseMMO\\logs\\launcher.log)
+# ─────────────────────────────────────────────────────────────────────────────
+LOG_DIR  = BASE_DIR / "logs"
+LOG_FILE = LOG_DIR / "launcher.log"
+
+def _setup_logging():
+    logger = logging.getLogger("cobbleverse")
+    if logger.handlers:
+        return logger
+    logger.setLevel(logging.DEBUG)
+    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        fh = logging.handlers.RotatingFileHandler(
+            LOG_FILE, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+    except Exception:
+        pass
+    return logger
+
+log = _setup_logging()
+
+def log_exc(msg):
+    """Registra un error con su traza completa (para diagnosticar fallos)."""
+    log.error("%s\n%s", msg, traceback.format_exc())
+
+
 # Página que ve el usuario en el navegador tras iniciar sesión con Microsoft.
 _LOGIN_DONE_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>CobbleverseMMO</title></head>
@@ -133,6 +163,16 @@ def find_assets_dir():
         if d.is_dir():
             return d
     return LAUNCHER_DIR / "Imagenes"
+
+def find_backgrounds():
+    """Fondos rotativos ya optimizados en web/bg/ (genéralos con optimizar_fondos.py)."""
+    d = find_web_dir() / "bg"
+    if not d.is_dir():
+        return []
+    def num(p):
+        digits = "".join(c for c in p.stem if c.isdigit())
+        return int(digits) if digits else 0
+    return [f"bg/{p.name}" for p in sorted(d.glob("bg*.jpg"), key=num)]
 
 def stage_web_assets():
     """Copy the icon/logo into web/ so the page can load them as same-origin
@@ -283,26 +323,64 @@ def pending_files(manifest, game_dir):
             out.append(e)
     return out
 
-def dl_one(url, dest):
+def dl_one(url, dest, retries=3):
+    """Descarga con reintentos y escritura atómica (.part → destino), para que un
+    corte de red no deje archivos a medias ni aborte la descarga entera."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, stream=True, timeout=120) as r:
-        r.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in r.iter_content(65536): f.write(chunk)
+    tmp = dest.with_name(dest.name + ".part")
+    last = None
+    for attempt in range(1, retries + 1):
+        try:
+            # (conexión, lectura): si el servidor se atasca, falla rápido y reintenta
+            with requests.get(url, stream=True, timeout=(15, 60)) as r:
+                r.raise_for_status()
+                with open(tmp, "wb") as f:
+                    for chunk in r.iter_content(65536):
+                        if chunk:
+                            f.write(chunk)
+            tmp.replace(dest)
+            return
+        except Exception as ex:
+            last = ex
+            log.warning("Descarga fallida (%d/%d) %s: %s", attempt, retries, dest.name, ex)
+            if attempt < retries:
+                time.sleep(min(2 ** attempt, 8))
+    try: tmp.unlink()
+    except Exception: pass
+    raise last
 
-def dl_parallel(files, game_dir, on_prog, on_log, cancel_ev=None, workers=16):
-    total = len(files); done = 0; errors = []; lock = threading.Lock()
+def dl_parallel(files, game_dir, on_prog, on_log, cancel_ev=None, workers=8):
+    """IMPORTANTE: on_prog/on_log se llaman FUERA del lock. Antes se llamaban
+    dentro, y como on_prog hace una llamada síncrona lenta a la UI, los hilos de
+    descarga se serializaban y la descarga se arrastraba (parecía colgada)."""
+    total = len(files) or 1
+    done = 0
+    errors = []
+    lock = threading.Lock()
+
     def _t(e):
         nonlocal done
         if cancel_ev and cancel_ev.is_set():
-            with lock: done += 1; on_prog(done / total * 100)
+            with lock: done += 1
             return
+        err = None
         try:
             dl_one(e["url"], game_dir / e["path"])
-            with lock: done += 1; on_prog(done / total * 100); on_log(f"  + {e['path']}")
         except Exception as ex:
-            with lock: done += 1; on_prog(done / total * 100); errors.append((e["path"], str(ex)))
-    with ThreadPoolExecutor(max_workers=workers) as ex: list(ex.map(_t, files))
+            err = (e["path"], str(ex))
+        with lock:
+            done += 1
+            n = done
+            if err:
+                errors.append(err)
+        on_prog(n / total * 100)          # fuera del lock
+        if err:
+            log.error("No se pudo descargar %s: %s", err[0], err[1])
+        else:
+            on_log(e["path"])
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        list(ex.map(_t, files))
     return errors
 
 def fmt_bytes(b):
@@ -434,6 +512,8 @@ class Api:
         self._ldata = None
         self._cancel_ev = threading.Event()
         self._thread = None
+        self._last_pct = -1
+        self._last_prog_t = 0.0
 
     # ── helpers ───────────────────────────────────────────────────────────────
     def _ver_index(self):
@@ -450,6 +530,15 @@ class Api:
             pass
 
     def _progress(self, pct, label=None):
+        # Limita las actualizaciones sin etiqueta (evaluate_js es lento y con
+        # cientos de archivos saturaría el hilo de UI).
+        if label is None:
+            now = time.time()
+            p = int(pct)
+            if p == self._last_pct and (now - self._last_prog_t) < 0.15:
+                return
+            self._last_pct = p
+            self._last_prog_t = now
         self._emit("setProgress", pct, label)
 
     # ── bootstrap ─────────────────────────────────────────────────────────────
@@ -459,6 +548,7 @@ class Api:
             "appVersion": APP_VERSION,
             "logo": assets.get("logo"),
             "cornerIcon": assets.get("cornerIcon"),
+            "backgrounds": find_backgrounds(),
             "versions": [{"label": v["label"], "sub": v["sub"], "ram": v["ram"]} for v in VERSIONS],
             "versionIndex": self._ver_index(),
             "ram": self.ram,
@@ -677,6 +767,15 @@ class Api:
         except Exception: pass
         return str(d)
 
+    def open_logs(self):
+        """Abre la carpeta del informe (log) para que los testers lo envíen."""
+        try:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(LOG_DIR))
+        except Exception:
+            log_exc("No se pudo abrir la carpeta de logs")
+        return str(LOG_FILE)
+
     def open_install(self):
         return self._open_game_subfolder()
 
@@ -772,29 +871,58 @@ class Api:
         try:
             ver_cfg = VERSIONS_CFG[self.ver]
             game_dir = Path(ver_cfg["game_dir"]); game_dir.mkdir(parents=True, exist_ok=True)
+            log.info("=== JUGAR | versión=%s | dir=%s ===", self.ver, game_dir)
 
             # 1. Modpack (base de Modrinth + contenido propio del equipo en extra/)
             self._progress(2, "Verificando archivos...")
             try:
                 manifest = fetch_manifest(ver_cfg["manifest"])
             except Exception as e:
+                log_exc("Fallo al descargar el manifest")
                 self._fail(f"Error de red: {str(e)[:80]}"); return
             manifest.setdefault("files", [])
             manifest["files"] += fetch_extra_files(self.ver)   # best-effort; [] si no hay
+            log.info("Manifest: %d archivos en total", len(manifest["files"]))
 
             pending = pending_files(manifest, game_dir)
             if pending:
                 sz = fmt_bytes(sum(e.get("size", 0) for e in pending))
+                log.info("Pendientes: %d archivos (%s)", len(pending), sz)
                 self._progress(5, f"Descargando {len(pending)} archivos ({sz})...")
-                dl_parallel(pending, game_dir,
-                            on_prog=lambda p: self._progress(5 + p * 0.30, None),
-                            on_log=lambda m: None,
-                            cancel_ev=self._cancel_ev, workers=16)
+                errors = dl_parallel(pending, game_dir,
+                                     on_prog=lambda p: self._progress(5 + p * 0.30, None),
+                                     on_log=lambda m: None,
+                                     cancel_ev=self._cancel_ev)
                 if self._cancel_ev.is_set():
                     self._fail("Cancelado."); return
+
+                # Reintento final de los que fallaron (red inestable, corte, etc.)
+                if errors:
+                    log.warning("Fallaron %d archivo(s); reintentando...", len(errors))
+                    failed = {p for p, _ in errors}
+                    retry = [e for e in pending if e["path"] in failed]
+                    self._progress(32, f"Reintentando {len(retry)} archivo(s)...")
+                    errors = dl_parallel(retry, game_dir,
+                                         on_prog=lambda p: self._progress(32 + p * 0.03, None),
+                                         on_log=lambda m: None,
+                                         cancel_ev=self._cancel_ev, workers=4)
+                    if self._cancel_ev.is_set():
+                        self._fail("Cancelado."); return
+                    if errors:
+                        for p, msg in errors:
+                            log.error("DEFINITIVO: no se descargó %s (%s)", p, msg)
+                        self._fail(f"No se pudieron descargar {len(errors)} archivo(s). "
+                                   "Revisa tu conexión y vuelve a pulsar JUGAR "
+                                   "(Ajustes → Ver informe).")
+                        return
+                log.info("Descarga completada")
+            else:
+                log.info("Modpack ya al día")
+
             # borrar mods/archivos retirados del modpack (no toca lo del jugador)
             removed = apply_removals(manifest, game_dir)
             if removed:
+                log.info("Eliminados %d archivo(s) retirados: %s", len(removed), removed[:10])
                 self._progress(34, f"Eliminados {len(removed)} archivo(s) retirado(s) del modpack")
             self._progress(35, "Verificando Minecraft...")
 
@@ -844,9 +972,11 @@ class Api:
                 self._fail("Cancelado.", reset_ready=False); return
             self._launch()
         except Exception as ex:
+            log_exc("Error inesperado en el proceso de preparación")
             self._fail(f"Error: {str(ex)[:100]}")
 
     def _fail(self, msg, reset_ready=True):
+        log.error("FALLO: %s", msg)
         self.playing = False
         if reset_ready:
             self.ready = False
@@ -875,6 +1005,9 @@ class Api:
                 version=d["fab_id"], minecraft_directory=str(MC_DIR), options=opts)
             if self._cancel_ev.is_set():
                 return
+            log.info("Lanzando MC | fabric=%s | java=%s | RAM=%sG | cuenta=%s (%s)",
+                     d["fab_id"], d["java"], self.ram,
+                     d["creds"]["username"], d["creds"].get("user_type"))
             self._progress(100, "▶ Lanzando Minecraft...")
             proc = subprocess.Popen(cmd, cwd=d["game_dir"], creationflags=NOWND)
             self._mc_proc = proc
@@ -956,6 +1089,10 @@ def ensure_webview2():
         return False
 
 def main():
+    log.info("=" * 60)
+    log.info("CobbleverseMMO Launcher v%s | frozen=%s | Python %s",
+             APP_VERSION, getattr(sys, "frozen", False), sys.version.split()[0])
+    log.info("Datos: %s | Log: %s", BASE_DIR, LOG_FILE)
     api = Api()
     web_dir = find_web_dir()
     html_path = str(web_dir / "launcher.html")

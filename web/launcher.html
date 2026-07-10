@@ -30,6 +30,8 @@
   .hov{transition:all .16s}
   .hidden{display:none!important}
   .pywebview-drag-region{cursor:default}
+  /* capas del fondo rotativo: solo se anima opacity (barato para WebView2) */
+  .bglayer{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.6s ease-in-out;will-change:opacity}
   /* WebView2 software-composites backdrop-filter every frame — disabling it is
      the single biggest perf win. Panels keep their translucent backgrounds. */
   *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
@@ -40,24 +42,25 @@
 <body>
 <div style="position:relative;width:100vw;height:100vh;overflow:hidden;background:#04060d;color:#fff">
 
-  <!-- starfield -->
+  <!-- fondos rotativos (cross-fade lento) -->
+  <div id="bgA" class="bglayer"></div>
+  <div id="bgB" class="bglayer"></div>
+  <!-- capa oscura para que la interfaz se lea bien sobre las fotos -->
+  <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(4,6,13,.86) 0%,rgba(4,6,13,.55) 32%,rgba(4,6,13,.60) 62%,rgba(4,6,13,.93) 100%)"></div>
+  <!-- starfield (solo si no hay fondos) -->
   <div id="stars" style="position:absolute;inset:0;overflow:hidden"></div>
   <!-- aura glows -->
-  <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(70% 55% at 50% 12%,rgba(212,175,55,.14),transparent 60%),radial-gradient(90% 70% at 50% 105%,rgba(43,184,217,.1),transparent 60%);animation:cvglow 6s ease-in-out infinite"></div>
+  <div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(70% 55% at 50% 12%,rgba(212,175,55,.12),transparent 60%),radial-gradient(90% 70% at 50% 105%,rgba(43,184,217,.08),transparent 60%);animation:cvglow 6s ease-in-out infinite"></div>
   <!-- inner gold frame -->
   <div style="position:absolute;inset:6px;border-radius:12px;border:1px solid rgba(212,175,55,.25);pointer-events:none"></div>
-  <!-- background watermark -->
-  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding-bottom:60px">
-    <div id="bgwatermark" style="width:760px;max-width:70%;height:300px;background-position:center;background-repeat:no-repeat;background-size:contain;opacity:.92;filter:drop-shadow(0 0 60px rgba(212,175,55,.55))"></div>
-  </div>
 
   <div style="position:relative;height:100%;display:flex;flex-direction:column">
 
     <!-- ===== TOP BAR ===== -->
     <header style="flex:none;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid rgba(212,175,55,.28);background:rgba(6,8,15,.55);backdrop-filter:blur(14px)">
-      <div class="pywebview-drag-region" style="display:flex;align-items:center;gap:10px;flex:1;height:100%;align-self:stretch">
-        <img id="cornerIcon" alt="CobbleverseMMO" style="width:38px;height:38px;object-fit:contain;image-rendering:auto;filter:drop-shadow(0 2px 6px rgba(212,175,55,.4))">
-        <span style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.16);padding:3px 7px;border-radius:5px">LAUNCHER</span>
+      <div class="pywebview-drag-region" style="display:flex;align-items:center;gap:11px;flex:1;height:100%;align-self:stretch">
+        <img id="cornerIcon" alt="" style="width:36px;height:36px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(212,175,55,.4))">
+        <img id="headerLogo" alt="CobbleverseMMO" style="height:30px;width:auto;object-fit:contain;filter:drop-shadow(0 2px 10px rgba(212,175,55,.45))">
       </div>
 
       <div style="display:flex;align-items:center;gap:14px">
@@ -385,6 +388,15 @@
               Carpeta de shaders
             </button>
           </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:13.5px;font-weight:700;margin-bottom:4px">¿Algo falló?</label>
+          <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-bottom:9px">Abre el informe y envíalo al equipo para que lo arreglemos.</p>
+          <button onclick="cv.openLogs()" class="hov" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;border-radius:10px;background:rgba(224,88,79,.12);border:1px solid rgba(224,88,79,.4);font-size:12.5px;font-weight:700;color:#ff9b93">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Ver informe de errores (log)
+          </button>
+          <p id="logPath" style="font-size:10.5px;color:rgba(255,255,255,.35);margin-top:7px;font-family:ui-monospace,monospace;word-break:break-all"></p>
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:11px;padding:18px 24px;border-top:1px solid rgba(255,255,255,.08)">

@@ -23,3 +23,6 @@ upload_lite.ps1
 
 # Azure Client ID privado (no exponer en el repo público)
 ms_config.py
+
+# imagenes fondo originales (pesadas). Las optimizadas van en web/bg/
+imagenes fondo/

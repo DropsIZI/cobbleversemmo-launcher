@@ -27,7 +27,7 @@
     newsOpen: true,
     skin: { head: null, body: null, source: null },
     appVersion: "1.0.0",
-    bg: null,
+    backgrounds: [],
     logo: null,
     cornerIcon: null,
     installDir: "",
@@ -46,6 +46,33 @@
     var lbl = $("skinPresetName");
     if (lbl) lbl.textContent = state.skin.source === "premium" ? "Skin de tu cuenta"
       : state.skin.source === "custom" ? "Skin personalizada" : "Skin por defecto";
+  }
+
+  // ── fondos rotativos ────────────────────────────────────────────────────────
+  function startBackgrounds() {
+    var list = state.backgrounds || [];
+    if (!list.length) return;
+    var a = $("bgA"), b = $("bgB");
+    var i = 0, showingA = true;
+    a.style.backgroundImage = "url('" + list[0] + "')";
+    a.style.opacity = "1";
+    if (list.length < 2) return;
+
+    function next() {
+      var n = (i + 1) % list.length;
+      var incoming = showingA ? b : a;
+      var outgoing = showingA ? a : b;
+      var pre = new Image();          // precarga antes de fundir (sin parpadeo)
+      pre.onload = function () {
+        incoming.style.backgroundImage = "url('" + list[n] + "')";
+        incoming.style.opacity = "1";
+        outgoing.style.opacity = "0";
+        showingA = !showingA;
+        i = n;
+      };
+      pre.src = list[n];
+    }
+    setInterval(next, 9000);          // 9 s por imagen, fundido de 1.6 s
   }
 
   // ── starfield ──────────────────────────────────────────────────────────────
@@ -229,6 +256,7 @@
     browseJava: function () { call("browse_java").then(function (p) { if (p) { state.java = p; $("javaPath").value = p; } }); },
     openMods: function () { call("open_mods"); },
     openShaders: function () { call("open_shaders"); },
+    openLogs: function () { call("open_logs").then(function (p) { if (p) $("logPath").textContent = p; }); },
     browseInstall: function () { call("open_install"); },
 
     // misc
@@ -287,10 +315,12 @@
     // bootstrap
     init: function (data) {
       Object.keys(data || {}).forEach(function (k) { state[k] = data[k]; });
-      renderStars();
-      var logo = state.logo || state.bg;
+      var hasBg = !!(state.backgrounds && state.backgrounds.length);
+      if (hasBg) startBackgrounds();
+      else renderStars();          // sin fotos, el cielo estrellado
+      var logo = state.logo;
       if (logo) {
-        $("bgwatermark").style.backgroundImage = "url('" + logo + "')";
+        $("headerLogo").src = logo;
         $("loginLogo").src = logo;
         $("splashLogo").src = logo;
       }
