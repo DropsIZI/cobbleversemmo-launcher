@@ -390,6 +390,14 @@
           </div>
         </div>
         <div>
+          <label style="display:block;font-size:13.5px;font-weight:700;margin-bottom:4px">Configuración del modpack</label>
+          <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-bottom:9px">Tus teclas y opciones se conservan. Restaura solo si algo se rompió.</p>
+          <button onclick="cv.repairConfigs()" class="hov" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);font-size:12.5px;font-weight:700;color:#fff">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6fd3ec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Restaurar configuración del modpack
+          </button>
+        </div>
+        <div>
           <label style="display:block;font-size:13.5px;font-weight:700;margin-bottom:4px">¿Algo falló?</label>
           <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-bottom:9px">Abre el informe y envíalo al equipo para que lo arreglemos.</p>
           <button onclick="cv.openLogs()" class="hov" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:42px;border-radius:10px;background:rgba(224,88,79,.12);border:1px solid rgba(224,88,79,.4);font-size:12.5px;font-weight:700;color:#ff9b93">

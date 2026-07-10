@@ -315,11 +315,21 @@ def apply_removals(manifest, game_dir):
         pass
     return removed
 
-def pending_files(manifest, game_dir):
+def is_user_config(path):
+    """Los archivos de config los edita el jugador (teclas, opciones) y los mods
+    los reescriben solos. Se instalan la PRIMERA vez y luego no se tocan."""
+    return path.startswith("config/")
+
+def pending_files(manifest, game_dir, force_config=False):
     out = []
     for e in manifest.get("files", []):
         p = game_dir / e["path"]
-        if not p.exists() or (e.get("sha256") and sha256(p) != e["sha256"]):
+        if not p.exists():
+            out.append(e)
+            continue
+        if is_user_config(e["path"]) and not force_config:
+            continue                       # ya existe → respetamos los ajustes del jugador
+        if e.get("sha256") and sha256(p) != e["sha256"]:
             out.append(e)
     return out
 
@@ -795,6 +805,41 @@ class Api:
         try: os.startfile(str(d))
         except Exception: pass
         return str(d)
+
+    def repair_configs(self):
+        """Vuelve a bajar los configs del modpack (sobrescribe los del jugador).
+        Útil si algo se rompió o si el modpack cambió su configuración."""
+        if self.playing or (self._thread and self._thread.is_alive()):
+            return False
+        self._thread = threading.Thread(target=self._repair_worker, daemon=True)
+        self._thread.start()
+        return True
+
+    def _repair_worker(self):
+        try:
+            log.info("Restaurando configuración del modpack (%s)", self.ver)
+            ver_cfg = VERSIONS_CFG[self.ver]
+            game_dir = Path(ver_cfg["game_dir"]); game_dir.mkdir(parents=True, exist_ok=True)
+            self._progress(3, "Restaurando configuración del modpack...")
+            manifest = fetch_manifest(ver_cfg["manifest"])
+            cfgs = [e for e in manifest.get("files", []) if is_user_config(e["path"])]
+            if not cfgs:
+                self._progress(100, "No hay configuración que restaurar.")
+                return
+            errors = dl_parallel(cfgs, game_dir,
+                                 on_prog=lambda p: self._progress(3 + p * 0.95, None),
+                                 on_log=lambda m: None,
+                                 cancel_ev=threading.Event())
+            if errors:
+                log.error("Restaurar config: fallaron %d archivo(s)", len(errors))
+                self._progress(0, f"No se pudieron restaurar {len(errors)} archivo(s). Ver informe.")
+            else:
+                self.ready = False           # que revalide al pulsar JUGAR
+                log.info("Configuración restaurada (%d archivos)", len(cfgs))
+                self._progress(100, f"Configuración restaurada ({len(cfgs)} archivos). Pulsa JUGAR.")
+        except Exception:
+            log_exc("Fallo al restaurar la configuración")
+            self._progress(0, "Error al restaurar la configuración. Ver informe.")
 
     def open_logs(self):
         """Abre la carpeta del informe (log) para que los testers lo envíen."""

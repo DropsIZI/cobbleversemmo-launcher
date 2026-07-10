@@ -257,6 +257,11 @@
     openMods: function () { call("open_mods"); },
     openShaders: function () { call("open_shaders"); },
     openLogs: function () { call("open_logs").then(function (p) { if (p) $("logPath").textContent = p; }); },
+    repairConfigs: function () {
+      if (!confirm("Esto volverá a descargar la configuración del modpack y sobrescribirá tus ajustes (teclas, opciones).\n\n¿Continuar?")) return;
+      $("settings").classList.add("hidden");
+      call("repair_configs");
+    },
     browseInstall: function () { call("open_install"); },
 
     // misc
