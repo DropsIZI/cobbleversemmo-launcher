@@ -11,7 +11,7 @@ Ejecuta esto cada vez que cambies las imágenes de fondo:
 """
 
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "imagenes fondo"
@@ -20,6 +20,12 @@ DST = ROOT / "web" / "bg"
 TARGET = (1600, 900)   # suficiente para la ventana del launcher
 QUALITY = 80
 EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+
+# Las capturas del juego suelen ser oscuras (cuevas/noche). Las realzamos un poco
+# para que se vean bien detrás de la interfaz.
+BRIGHTNESS = 1.45
+CONTRAST = 1.06
+SATURATION = 1.12
 
 
 def main():
@@ -46,6 +52,10 @@ def main():
         left = (im.width - tw) // 2
         top = (im.height - th) // 2
         im = im.crop((left, top, left + tw, top + th))
+
+        im = ImageEnhance.Brightness(im).enhance(BRIGHTNESS)
+        im = ImageEnhance.Contrast(im).enhance(CONTRAST)
+        im = ImageEnhance.Color(im).enhance(SATURATION)
 
         out = DST / f"bg{i}.jpg"
         im.save(out, "JPEG", quality=QUALITY, optimize=True, progressive=True)
