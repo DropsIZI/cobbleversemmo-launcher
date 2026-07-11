@@ -43,3 +43,63 @@ Name: "{userdesktop}\CobbleverseMMO Launcher"; Filename: "{app}\{#MyAppExe}"; Ta
 
 [Run]
 Filename: "{app}\{#MyAppExe}"; Description: "Abrir CobbleverseMMO Launcher ahora"; Flags: nowait postinstall skipifsilent
+
+[Code]
+{ Desinstala cualquier versión anterior antes de instalar la nueva.
+  Busca por NOMBRE en el registro (robusto: no depende del AppId). }
+const
+  UNINST_BASE = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\';
+
+function FindUninstallInRoot(RootKey: Integer): String;
+var
+  names: TArrayOfString;
+  i: Integer;
+  dn, us: String;
+begin
+  Result := '';
+  if RegGetSubkeyNames(RootKey, 'Software\Microsoft\Windows\CurrentVersion\Uninstall', names) then
+  begin
+    for i := 0 to GetArrayLength(names) - 1 do
+    begin
+      if RegQueryStringValue(RootKey, UNINST_BASE + names[i], 'DisplayName', dn) then
+      begin
+        if dn = '{#MyAppName}' then
+        begin
+          if RegQueryStringValue(RootKey, UNINST_BASE + names[i], 'UninstallString', us) then
+          begin
+            Result := us;
+            Exit;
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+function GetUninstallString(): String;
+begin
+  Result := FindUninstallInRoot(HKCU);
+  if Result = '' then
+    Result := FindUninstallInRoot(HKLM);
+end;
+
+procedure UnInstallOldVersion();
+var
+  s: String;
+  iResultCode: Integer;
+begin
+  s := GetUninstallString();
+  Log('CVDEBUG UninstallString=[' + s + ']');
+  if s <> '' then
+  begin
+    s := RemoveQuotes(s);
+    Exec(s, '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE, ewWaitUntilTerminated, iResultCode);
+    Log('CVDEBUG desinstalador ejecutado, code=' + IntToStr(iResultCode));
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+    UnInstallOldVersion();
+end;
