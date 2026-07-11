@@ -8,6 +8,12 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 
+# pywebview usa .NET (pythonnet) para la ventana. Por defecto pythonnet intenta
+# cargar .NET Core, que NO está en todos los PC → error "Failed to resolve
+# Python.Runtime.Loader.Initialize". Forzamos .NET Framework 4.x, presente en
+# TODOS los Windows 10/11 de fábrica. (Debe fijarse antes de importar webview.)
+os.environ.setdefault("PYTHONNET_RUNTIME", "netfx")
+
 NOWND = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 # When running as compiled exe all packages are already bundled — skip pip install
@@ -1200,4 +1206,22 @@ if __name__ == "__main__":
             sys.exit(0)
         if not ensure_webview2():
             sys.exit(0)
-    main()
+    try:
+        main()
+    except Exception:
+        # Red de seguridad: cualquier fallo al arrancar se guarda en el log y se
+        # muestra un mensaje claro (en vez del error críptico de PyInstaller).
+        log_exc("FALLO AL ARRANCAR EL LAUNCHER")
+        if os.name == "nt":
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0,
+                    "No se pudo abrir el launcher.\n\n"
+                    "Envíanos el archivo de informe para arreglarlo:\n"
+                    f"{LOG_FILE}\n\n"
+                    "(Cópialo y pásalo al equipo por Discord.)",
+                    "CobbleverseMMO Launcher", 0x10)
+            except Exception:
+                pass
+        sys.exit(1)
